@@ -69,45 +69,50 @@ def print_base_usage_and_exit() -> None:
 def print_long_usage_and_exit() -> None:
     base_usage = get_base_usage()
 
-    long_usage=(
-        '\n'
-        'Icinga check for size and amount of docker logs files\n'
-        '\n'
-        f'Base usage: {base_usage}\n'
-        '\n'
-        'Mandatory arguments:\n'
-        '  --max_size_warning=n:\n'
-        '    warning if any log file is bigger that n in MB\n'
-        '\n'
-        '  --max_size_critical=n:\n'
-        '    critical if any log file is bigger that n in MB\n'
-        '\n'
-        '  --max_amount_warning=n:\n'
-        '    warning if any container has more than n log files\n'
-        '    (default: unlimited)\n'
-        '\n'
-        '  --max_amount_critical=n:\n'
-        '    critical if any container has more than n log files\n'
-        '    (default: unlimited)\n'
-        '\n'
-        'Optional arguments:\n'
-        '  --help:\n'
-        '    show this\n'
-        '\n'
-        '  --version:\n'
-        '    show program version\n'
-        '\n'
-        '  --run_as=name\n'
-        '    re-call using sudo -u <name>. Might be required to access the \n'
-        '    /var/lib/docker/ files\n'
-        '\n'
-        '  --containers_dir=DIR:\n'
-        '    the base directory to scan for logs '
-        '(default: /var/lib/docker/containers)'
-        '\n'
-    )
+    long_usage=f'''
 
-    print(long_usage)
+        Icinga check for size and amount of docker logs files
+
+        Base usage:
+            {base_usage}
+
+        Mandatory arguments:
+          --max_size_warning=n:
+            warning if any log file is bigger that n in MB
+
+          --max_size_critical=n:
+            critical if any log file is bigger that n in MB
+
+          --max_amount_warning=n:
+            warning if any container has more than n log files
+            (default: unlimited)
+
+          --max_amount_critical=n:
+            critical if any container has more than n log files
+            (default: unlimited)
+
+        Optional arguments:
+          --help:
+            show this
+
+          --version:
+            show program version
+
+          --run_as=name
+            re-call using sudo -u <name>. Might be required to access the
+            /var/lib/docker/ files
+
+          --containers_dir=DIR:
+            the base directory to scan for logs 
+            (default: /var/lib/docker/containers)
+
+        Bugs and hints: lrsklemstein@gmail.com
+    '''
+
+    long_usage_formatted = '\n'.join(
+            [line[8:] for line in long_usage.split('\n')])
+
+    print(long_usage_formatted)
     sys.exit(RC_UNKNOWN)
 
 
@@ -115,7 +120,7 @@ def get_base_usage() -> str:
     prog = os.path.basename(sys.argv[0])
 
     usage = (
-        f'{prog} [--help] [--version] [--run_as name] '
+        f'{prog} [--help] [--version] [--run_as name] '
         '[--containers_dir=DIR] '
         '--max_size_warning=<n MB> --max_size_critical=<n MB> '
         '[--max_amount_warning=<n>] [--max_amount_critical=<n>]' 
@@ -127,7 +132,7 @@ def get_base_usage() -> str:
 def print_version_and_exit() -> None:
     prog = os.path.basename(sys.argv[0])
 
-    print(f'{prog} versuon {VERSION}')
+    print(f'{prog} versuon {VERSION}')
     sys.exit(RC_UNKNOWN)
 
 
