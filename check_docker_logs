@@ -5,7 +5,7 @@
 #
 # Should work on Unix like systems (Linux, Macos, *BSD)
 #
-# Use sudo (with a suioers entry) for the --run_as option. 
+# Use sudo (with a suioers entry) for the --run_as option.
 #
 # bugs and hints: lrsklemstein@gmail.com
 # ****************************************************************************
@@ -17,7 +17,7 @@ import sys
 import traceback
 
 from subprocess import Popen, PIPE, STDOUT
-from typing import Any
+from typing import Any, Iterable
 
 t_setup = dict[str, Any]
 
@@ -26,7 +26,7 @@ t_setup = dict[str, Any]
 # constants
 # ----------------------------------------------------------------------------
 
-VERSION = '1.0.0'
+VERSION = "1.0.0"
 
 RC_OK = 0
 RC_WARNING = 1
@@ -40,22 +40,23 @@ RC_EXEC_CHECK = 66
 # functions
 # ----------------------------------------------------------------------------
 
+
 def main() -> None:
     try:
         setup: t_setup = get_setup_or_die()
 
-        if setup['run_as'] != '':
+        if setup["run_as"] != "":
             recall(setup)
 
         run_check_and_exit(setup)
 
-    except Exception as e:
+    except Exception:
         stacktrace = traceback.format_exc()
 
         is_interactive = sys.stdin.isatty() and sys.stdout.isatty()
 
         if not is_interactive:
-            stacktrace = 'UNKNOWN: ' + stacktrace.replace('\n', '\\n')
+            stacktrace = "UNKNOWN: " + stacktrace.replace("\n", "\\n")
 
         print(stacktrace)
         sys.exit(RC_UNKNOWN)
@@ -64,14 +65,14 @@ def main() -> None:
 def print_base_usage_and_exit() -> None:
     base_usage = get_base_usage()
 
-    print(f'Usage: {base_usage}')
+    print(f"Usage: {base_usage}")
     sys.exit(RC_UNKNOWN)
 
 
 def print_long_usage_and_exit() -> None:
     base_usage = get_base_usage()
 
-    long_usage=f'''
+    long_usage = f"""
 
         Icinga check for size and amount of docker logs files
 
@@ -109,10 +110,9 @@ def print_long_usage_and_exit() -> None:
             (default: /var/lib/docker/containers)
 
         Bugs and hints: lrsklemstein@gmail.com
-    '''
+    """
 
-    long_usage_formatted = '\n'.join(
-            [line[8:] for line in long_usage.split('\n')])
+    long_usage_formatted = "\n".join([line[8:] for line in long_usage.split("\n")])
 
     print(long_usage_formatted)
     sys.exit(RC_UNKNOWN)
@@ -122,10 +122,10 @@ def get_base_usage() -> str:
     prog = os.path.basename(sys.argv[0])
 
     usage = (
-        f'{prog} [--help] [--version] [--run_as=<name>] '
-        '[--containers_dir=<DIR>] '
-        '--max_size_warning=<mb> --max_size_critical=<mb> '
-        '[--max_amount_warning=<n>] [--max_amount_critical=<n>]' 
+        f"{prog} [--help] [--version] [--run_as=<name>] "
+        "[--containers_dir=<DIR>] "
+        "--max_size_warning=<mb> --max_size_critical=<mb> "
+        "[--max_amount_warning=<n>] [--max_amount_critical=<n>]"
     )
 
     return usage
@@ -134,7 +134,7 @@ def get_base_usage() -> str:
 def print_version_and_exit() -> None:
     prog = os.path.basename(sys.argv[0])
 
-    print(f'{prog} version {VERSION}')
+    print(f"{prog} version {VERSION}")
     sys.exit(RC_UNKNOWN)
 
 
@@ -143,58 +143,66 @@ def get_setup_or_die() -> t_setup:
         print_base_usage_and_exit()
 
     setup = {
-        'max_size_warning': None,
-        'max_size_critical': None,
-        'max_amount_warning': None,
-        'max_amount_critical': None,
-        'containers_dir': '/var/lib/docker/containers',
-        'run_as': '',
-        '__recalled': False,
-        '__exec_check': False,
+        "max_size_warning": None,
+        "max_size_critical": None,
+        "max_amount_warning": None,
+        "max_amount_critical": None,
+        "containers_dir": "/var/lib/docker/containers",
+        "run_as": "",
+        "__recalled": False,
+        "__exec_check": False,
     }
 
     opts, args = getopt.getopt(
-        sys.argv[1:], "",
-        ['max_size_warning=', 'max_size_critical=',
-         'max_amount_warning=', 'max_amount_critical=','containers_dir=',
-         'help', 'version', 'run_as=',
-         '__recalled', '__exec_check']
+        sys.argv[1:],
+        "",
+        [
+            "max_size_warning=",
+            "max_size_critical=",
+            "max_amount_warning=",
+            "max_amount_critical=",
+            "containers_dir=",
+            "help",
+            "version",
+            "run_as=",
+            "__recalled",
+            "__exec_check",
+        ],
     )
 
     if len(args) > 0:
         print_base_usage_and_exit()
 
     for k, v in opts:
-        if k == '--max_size_warning':
-            store_numerical_arg_or_die('max_size_warning', v, setup)
-        elif k == '--max_size_critical':
-            store_numerical_arg_or_die('max_size_critical', v, setup)
-        elif k == '--max_amount_warning':
-            store_numerical_arg_or_die('max_amount_warning', v, setup)
-        elif k == '--max_amount_critical':
-            store_numerical_arg_or_die('max_amount_critical', v, setup)
-        elif k == '--containers_dir':
-            setup['containers_dir'] = k
-        elif k == '--help':
+        if k == "--max_size_warning":
+            store_numerical_arg_or_die("max_size_warning", v, setup)
+        elif k == "--max_size_critical":
+            store_numerical_arg_or_die("max_size_critical", v, setup)
+        elif k == "--max_amount_warning":
+            store_numerical_arg_or_die("max_amount_warning", v, setup)
+        elif k == "--max_amount_critical":
+            store_numerical_arg_or_die("max_amount_critical", v, setup)
+        elif k == "--containers_dir":
+            setup["containers_dir"] = k
+        elif k == "--help":
             print_long_usage_and_exit()
-        elif k == '--version':
+        elif k == "--version":
             print_version_and_exit()
-        elif k == '--run_as':
-            setup['run_as'] = v
-        elif k == '--__recalled':
-            setup['__recalled'] = True
-        elif k == '--__exec_check':
-            print('FUMP************')
+        elif k == "--run_as":
+            setup["run_as"] = v
+        elif k == "--__recalled":
+            setup["__recalled"] = True
+        elif k == "--__exec_check":
+            print("FUMP************")
             sys.exit(RC_EXEC_CHECK)
         else:
-            raise NotImplementedError(f'key {k}')
+            raise NotImplementedError(f"key {k}")
 
-    if setup['__recalled']:
-        setup['run_as'] = ''
+    if setup["__recalled"]:
+        setup["run_as"] = ""
 
     if any(v is None for v in setup.values()):
-        nagios_exit('UNKNOWN',
-                    'not all required parameters are set! (see --help)')
+        nagios_exit("UNKNOWN", "not all required parameters are set! (see --help)")
 
     return setup
 
@@ -202,8 +210,7 @@ def get_setup_or_die() -> t_setup:
 def store_numerical_arg_or_die(k: str, v: str, setup: t_setup) -> None:
     if not v.isnumeric() or int(v) <= 0:
         nagios_exit(
-            'UNKNOWN',
-            f'value of --{k} must be numeric and >= 1 (but is "{v}")'
+            "UNKNOWN", f'value of --{k} must be numeric and >= 1 (but is "{v}")'
         )
 
     setup[k] = int(v)
@@ -212,17 +219,17 @@ def store_numerical_arg_or_die(k: str, v: str, setup: t_setup) -> None:
 def nagios_exit(level: str, msg: str) -> None:
     level = level.lower()
 
-    if level == 'ok':
-        print(f'OK: {msg}')
+    if level == "ok":
+        print(f"OK: {msg}")
         sys.exit(RC_OK)
-    elif level == 'warning':
-        print(f'WARNING: {msg}')
+    elif level == "warning":
+        print(f"WARNING: {msg}")
         sys.exit(RC_WARNING)
-    elif level == 'critical':
-        print(f'CRITICAL: {msg}')
+    elif level == "critical":
+        print(f"CRITICAL: {msg}")
         sys.exit(RC_CRITICAL)
-    elif level == 'unknown':
-        print(f'UNKNOWN: {msg}')
+    elif level == "unknown":
+        print(f"UNKNOWN: {msg}")
         sys.exit(RC_UNKNOWN)
     else:
         print(f'UNKNOWN: Received level "{level} for msg "{msg}"')
@@ -230,13 +237,20 @@ def nagios_exit(level: str, msg: str) -> None:
 
 
 def run_check_and_exit(setup: t_setup) -> None:
-    max_amount_warning, max_amount_critical, max_size_warning, \
-            max_size_critical = get_warnings_and_criticals(setup)
+    max_amount_warning, max_amount_critical, max_size_warning, max_size_critical = (
+        get_warnings_and_criticals(setup)
+    )
 
-    if all(len(l) == 0 for l in
-           (max_amount_warning, max_amount_critical,
-            max_size_warning, max_size_critical)):
-        nagios_exit('OK', 'Docker log file amounts and sizes are fine')
+    if all(
+        len(check_list) == 0
+        for check_list in (
+            max_amount_warning,
+            max_amount_critical,
+            max_size_warning,
+            max_size_critical,
+        )
+    ):
+        nagios_exit("OK", "Docker log file amounts and sizes are fine")
     else:
         amount_critical = len(max_amount_critical)
         amount_warning = len(max_amount_warning)
@@ -244,70 +258,69 @@ def run_check_and_exit(setup: t_setup) -> None:
         size_warning = len(max_size_warning)
 
         if amount_critical > 0 or size_critical > 0:
-            state = 'CRITICAL'
             dirs_critical = sorted(set(max_amount_critical + max_size_critical))
             len_dirs_critical = len(dirs_critical)
 
             if len_dirs_critical <= 5:
-                dirs_string = ', '.join(dirs_critical)
+                dirs_string = ", ".join(dirs_critical)
             else:
-                dirs_string = ', '.join(dirs_critical[:5]) + ', [...]'
+                dirs_string = ", ".join(dirs_critical[:5]) + ", [...]"
             nagios_exit(
-                'CRITICAL',
+                "CRITICAL",
                 (
                     f"{len_dirs_critical} container ID('s) "
                     f"with critical log state: {dirs_string}"
-                )
+                ),
             )
-        else:
-            state = 'WARNING'
+        elif amount_warning > 0 or size_warning > 0:
             dirs_warning = sorted(set(max_amount_warning + max_size_warning))
             len_dirs_warning = len(dirs_warning)
 
             if len_dirs_warning <= 5:
-                dirs_string = ', '.join(dirs_warning)
+                dirs_string = ", ".join(dirs_warning)
             else:
-                dirs_string = ', '.join(dirs_warning[:5]) + ', [...]'
+                dirs_string = ", ".join(dirs_warning[:5]) + ", [...]"
             nagios_exit(
-                'WARNING',
-                    (
-                        f"{len_dirs_warning} container ID('s) "
-                        f"with warning log state: {dirs_string}"
-                    )
+                "WARNING",
+                (
+                    f"{len_dirs_warning} container ID('s) "
+                    f"with warning log state: {dirs_string}"
+                ),
             )
+        else:
+            raise NotImplementedError("I have no clue why I am here!")
 
 
 def get_warnings_and_criticals(setup: t_setup):
-    dirs = get_container_sub_dirs(setup['containers_dir'])
+    dirs = get_container_sub_dirs(setup["containers_dir"])
 
     max_amount_warning = list()
     max_amount_critical = list()
     max_size_warning = list()
     max_size_critical = list()
 
-    max_size_bytes_warning = setup['max_size_warning'] * 1024 * 1024
-    max_size_bytes_critical = setup['max_size_critical'] * 1024 * 1024
+    max_size_bytes_warning = setup["max_size_warning"] * 1024 * 1024
+    max_size_bytes_critical = setup["max_size_critical"] * 1024 * 1024
 
     for dir in dirs:
         log_status = get_log_status_for_container_id(setup, dir)
 
-        if len(log_status) > setup['max_amount_critical']:
+        if len(log_status) > setup["max_amount_critical"]:
             max_amount_critical.append(dir)
-        elif len(log_status) > setup['max_amount_warning']:
+        elif len(log_status) > setup["max_amount_warning"]:
             max_amount_warning.append(dir)
-        
+
         for f, size in log_status:
             if size > max_size_bytes_critical:
                 max_size_critical.append(dir)
             elif size > max_size_bytes_warning:
                 max_size_warning.append(dir)
 
-    return max_amount_warning, max_amount_critical, \
-            max_size_warning, max_size_critical
-    
+    return max_amount_warning, max_amount_critical, max_size_warning, max_size_critical
+
 
 def get_container_sub_dirs(containers_dir: str) -> tuple[str, ...]:
-    pattern_sha256 = re.compile('[a-z0-9]{64}')
+    pattern_sha256 = re.compile("[a-z0-9]{64}")
     dirs = list()
 
     for dir in os.listdir(containers_dir):
@@ -318,14 +331,14 @@ def get_container_sub_dirs(containers_dir: str) -> tuple[str, ...]:
 
 
 def get_log_status_for_container_id(
-        setup: t_setup, container_id: str) -> tuple[tuple[str,str], ...]:
-
-    container_sub_dir = os.path.join(setup['containers_dir'], container_id)
+    setup: t_setup, container_id: str
+) -> tuple[tuple[str, int], ...]:
+    container_sub_dir = os.path.join(setup["containers_dir"], container_id)
 
     log_files = list()
 
     for file in os.listdir(container_sub_dir):
-        if not file.endswith('-json.log'):
+        if not file.endswith("-json.log"):
             continue
 
         file_fqfn = os.path.join(container_sub_dir, file)
@@ -337,34 +350,35 @@ def get_log_status_for_container_id(
 
 
 def recall(setup: t_setup) -> None:
-    sudo_user = setup['run_as']
+    sudo_user = setup["run_as"]
 
-    sudo_prog = '/usr/bin/sudo'
+    sudo_prog = "/usr/bin/sudo"
 
-    new_prog_call = ' '.join(sys.argv) + ' --__recall'
+    new_prog_call = " ".join(sys.argv) + " --__recall"
     prog = sys.argv[0]
 
-    sudo_check = f'{sudo_prog} -n -u {sudo_user} {prog} --__exec_check'
+    sudo_check = f"{sudo_prog} -n -u {sudo_user} {prog} --__exec_check"
     process = Popen(sudo_check, stdout=PIPE, stderr=STDOUT, shell=True)
 
     (output, err) = process.communicate()
     check_rc = process.wait()
 
     if check_rc != RC_EXEC_CHECK:
-        output_utf8 = output.decode('UTF-8').replace('\n', '\n')
+        output_utf8 = output.decode("UTF-8").replace("\n", "\n")
 
         nagios_exit(
-            'UNKNOWN',
-            f'Not allowed to execute "{new_prog_call}"; error => {output_utf8}')
+            "UNKNOWN",
+            f'Not allowed to execute "{new_prog_call}"; error => {output_utf8}',
+        )
 
-    sudo_call = f'{sudo_prog} -u {sudo_user} {new_prog_call}'
+    sudo_call = f"{sudo_prog} -u {sudo_user} {new_prog_call}"
 
     sys.exit(os.system(sudo_call))
-    
+
 
 # ----------------------------------------------------------------------------
 # main
 # ----------------------------------------------------------------------------
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
