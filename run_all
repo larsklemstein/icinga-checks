@@ -1,0 +1,5 @@
+#!/bin/bash
+
+echo check_docker_logs
+
+$PWD/check_docker_logs --max_size_warning=11 --max_size_critical=20 --max_amount_warning=6 --max_amount_critical=20 --run_as=root
