@@ -132,7 +132,7 @@ def get_base_usage() -> str:
 def print_version_and_exit() -> None:
     prog = os.path.basename(sys.argv[0])
 
-    print(f'{prog} versuon {VERSION}')
+    print(f'{prog} version {VERSION}')
     sys.exit(RC_UNKNOWN)
 
 
