@@ -16,7 +16,7 @@ import re
 import sys
 import traceback
 
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, STDOUT
 from typing import Any
 
 t_setup = dict[str, Any]
@@ -32,6 +32,8 @@ RC_OK = 0
 RC_WARNING = 1
 RC_CRITICAL = 2
 RC_UNKNOWN = 3
+
+RC_EXEC_CHECK = 66
 
 
 # ----------------------------------------------------------------------------
@@ -148,13 +150,15 @@ def get_setup_or_die() -> t_setup:
         'containers_dir': '/var/lib/docker/containers',
         'run_as': '',
         '__recalled': False,
+        '__exec_check': False,
     }
 
     opts, args = getopt.getopt(
         sys.argv[1:], "",
         ['max_size_warning=', 'max_size_critical=',
          'max_amount_warning=', 'max_amount_critical=','containers_dir=',
-         'help', 'version', 'run_as=', '__recalled']
+         'help', 'version', 'run_as=',
+         '__recalled', '__exec_check']
     )
 
     if len(args) > 0:
@@ -179,6 +183,9 @@ def get_setup_or_die() -> t_setup:
             setup['run_as'] = v
         elif k == '--__recalled':
             setup['__recalled'] = True
+        elif k == '--__exec_check':
+            print('FUMP************')
+            sys.exit(RC_EXEC_CHECK)
         else:
             raise NotImplementedError(f'key {k}')
 
@@ -332,18 +339,25 @@ def get_log_status_for_container_id(
 def recall(setup: t_setup) -> None:
     sudo_user = setup['run_as']
 
-    new_prog_call = ' '.join(sys.argv) + ' --__recall'
+    sudo_prog = '/usr/bin/sudo'
 
-    sudo_check = f'/usr/bin/sudo -l -u {sudo_user} {new_prog_call}'
-    process = Popen(sudo_check, stdout=PIPE, shell=True)
+    new_prog_call = ' '.join(sys.argv) + ' --__recall'
+    prog = sys.argv[0]
+
+    sudo_check = f'{sudo_prog} -n -u {sudo_user} {prog} --__exec_check'
+    process = Popen(sudo_check, stdout=PIPE, stderr=STDOUT, shell=True)
 
     (output, err) = process.communicate()
     check_rc = process.wait()
 
-    if check_rc != 0:
-        nagios_exit('UNKNOWN', 'Not allowed to execute "{new_prog_call}"')
+    if check_rc != RC_EXEC_CHECK:
+        output_utf8 = output.decode('UTF-8').replace('\n', '\n')
 
-    sudo_call = f'/usr/bin/sudo -u {sudo_user} {new_prog_call}'
+        nagios_exit(
+            'UNKNOWN',
+            f'Not allowed to execute "{new_prog_call}"; error => {output_utf8}')
+
+    sudo_call = f'{sudo_prog} -u {sudo_user} {new_prog_call}'
 
     sys.exit(os.system(sudo_call))
     
