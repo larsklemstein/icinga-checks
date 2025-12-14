@@ -122,9 +122,9 @@ def get_base_usage() -> str:
     prog = os.path.basename(sys.argv[0])
 
     usage = (
-        f'{prog} [--help] [--version] [--run_as name] '
-        '[--containers_dir=DIR] '
-        '--max_size_warning=<n MB> --max_size_critical=<n MB> '
+        f'{prog} [--help] [--version] [--run_as=<name>] '
+        '[--containers_dir=<DIR>] '
+        '--max_size_warning=<mb> --max_size_critical=<mb> '
         '[--max_amount_warning=<n>] [--max_amount_critical=<n>]' 
     )
 
