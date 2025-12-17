@@ -193,7 +193,6 @@ def get_setup_or_die() -> t_setup:
         elif k == "--__recalled":
             setup["__recalled"] = True
         elif k == "--__exec_check":
-            print("FUMP************")
             sys.exit(RC_EXEC_CHECK)
         else:
             raise NotImplementedError(f"key {k}")
