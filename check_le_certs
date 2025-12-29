@@ -81,6 +81,11 @@ def print_long_usage_and_exit() -> None:
             {base_usage}
 
         Mandatory arguments:
+          --warning=days:
+            Which expiration time in days to be trigger a warning
+
+          --critical=days:
+            Which expiration time in days to be trigger a critical
 
         Optional arguments:
           --help:
@@ -89,9 +94,12 @@ def print_long_usage_and_exit() -> None:
           --version:
             show program version
 
-          --run_as=name
+          --run_as=name:
             re-call using sudo -u <name>. Might be required to access the
             /var/lib/docker/ files
+
+          --certbot=CERTBOT:
+            Use another program as certbot (default: /usr/bin/certbot)
 
         Bugs and hints: lrsklemstein@gmail.com
     """
