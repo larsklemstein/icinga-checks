@@ -1,0 +1,398 @@
+#!/usr/bin/env python3
+
+# ****************************************************************************
+# Icinga check for Lets' Encrypt certificate state 
+#
+# Should work on Unix like systems (Linux, Macos, *BSD)
+#
+# Use sudo (with a suioers entry) for the --run_as option.
+#
+# bugs and hints: lrsklemstein@gmail.com
+# ****************************************************************************
+
+import getopt
+import os.path
+import re
+import sys
+import traceback
+
+from datetime import datetime, timedelta, timezone
+from subprocess import Popen, PIPE, STDOUT
+from typing import Any, Iterable
+
+t_setup = dict[str, Any]
+
+
+# ----------------------------------------------------------------------------
+# constants
+# ----------------------------------------------------------------------------
+
+VERSION = "1.0.0"
+
+RC_OK = 0
+RC_WARNING = 1
+RC_CRITICAL = 2
+RC_UNKNOWN = 3
+
+RC_EXEC_CHECK = 66
+
+
+# ----------------------------------------------------------------------------
+# functions
+# ----------------------------------------------------------------------------
+
+
+def main() -> None:
+    try:
+        setup: t_setup = get_setup_or_die()
+
+        if setup["run_as"] != "":
+            recall(setup)
+
+        run_check_and_exit(setup)
+
+    except Exception:
+        stacktrace = traceback.format_exc()
+
+        is_interactive = sys.stdin.isatty() and sys.stdout.isatty()
+
+        if not is_interactive:
+            stacktrace = "UNKNOWN: " + stacktrace.replace("\n", "\\n")
+
+        print(stacktrace)
+        sys.exit(RC_UNKNOWN)
+
+
+def print_base_usage_and_exit() -> None:
+    base_usage = get_base_usage()
+
+    print(f"Usage: {base_usage}")
+    sys.exit(RC_UNKNOWN)
+
+
+def print_long_usage_and_exit() -> None:
+    base_usage = get_base_usage()
+
+    long_usage = f"""
+
+        Icinga check for Lets' Encrypt certificate state 
+
+        Base usage:
+            {base_usage}
+
+        Mandatory arguments:
+
+        Optional arguments:
+          --help:
+            show this
+
+          --version:
+            show program version
+
+          --run_as=name
+            re-call using sudo -u <name>. Might be required to access the
+            /var/lib/docker/ files
+
+        Bugs and hints: lrsklemstein@gmail.com
+    """
+
+    long_usage_formatted = "\n".join([line[8:] for line in long_usage.split("\n")])
+
+    print(long_usage_formatted)
+    sys.exit(RC_UNKNOWN)
+
+
+def get_base_usage() -> str:
+    prog = os.path.basename(sys.argv[0])
+
+    usage = (
+        '"{prog} [--help] [--version] [--run_as=<name>] '
+        '[--certbot=CERTBOT_PROGRAM] '
+        '--warning=days --critical=days'
+    )
+
+    return usage
+
+
+def print_version_and_exit() -> None:
+    prog = os.path.basename(sys.argv[0])
+
+    print(f"{prog} version {VERSION}")
+    sys.exit(RC_UNKNOWN)
+
+
+def get_setup_or_die() -> t_setup:
+    if len(sys.argv) == 1:
+        print_base_usage_and_exit()
+
+    setup = {
+        "containers_dir": "/var/lib/docker/containers",
+        "run_as": "",
+        "__recalled": False,
+        "__exec_check": False,
+        'certbot': '/usr/bin/certbot',
+        'warning': None,
+        'critical': None,
+    }
+
+    opts, args = getopt.getopt(
+        sys.argv[1:],
+        "",
+        [
+
+            "help",
+            "version",
+            "run_as=",
+            "certbot=",
+            "__recalled",
+            "__exec_check",
+            "warning=",
+            "critical=",
+        ],
+    )
+
+    if len(args) > 0:
+        print_base_usage_and_exit()
+
+    for k, v in opts:
+        if k == "--help":
+            print_long_usage_and_exit()
+        elif k == "--version":
+            print_version_and_exit()
+        elif k == "--run_as":
+            setup["run_as"] = v
+        elif k == "--__recalled":
+            setup["__recalled"] = True
+        elif k == "--__exec_check":
+            sys.exit(RC_EXEC_CHECK)
+        elif k == "--certbot":
+            setup["cerbot"] = v
+        elif k == "--warning":
+            store_numerical_arg_or_die('warning', v, setup)
+        elif k == "--critical":
+            store_numerical_arg_or_die('critical', v, setup)
+        else:
+            raise NotImplementedError(f"key {k}")
+
+    if setup["__recalled"]:
+        setup["run_as"] = ""
+
+    if any(v is None for v in setup.values()):
+        nagios_exit(
+            "UNKNOWN",
+            "not all required parameters are set! (see --help)")
+
+    if setup['warning'] < setup['critical']:
+        nagios_exit(
+            "UNKNOWN",
+                "warning value must be bigger than critical value)")
+
+    return setup
+
+
+def store_numerical_arg_or_die(k: str, v: str, setup: t_setup) -> None:
+    if not v.isnumeric() or int(v) <= 0:
+        nagios_exit(
+            "UNKNOWN", f'value of --{k} must be numeric and >= 1 (but is "{v}")'
+        )
+
+    setup[k] = int(v)
+
+
+def nagios_exit(level: str, msg: str) -> None:
+    level = level.lower()
+
+    if level == "ok":
+        print(f"OK: {msg}")
+        sys.exit(RC_OK)
+    elif level == "warning":
+        print(f"WARNING: {msg}")
+        sys.exit(RC_WARNING)
+    elif level == "critical":
+        print(f"CRITICAL: {msg}")
+        sys.exit(RC_CRITICAL)
+    elif level == "unknown":
+        print(f"UNKNOWN: {msg}")
+        sys.exit(RC_UNKNOWN)
+    else:
+        print(f'UNKNOWN: Received level "{level} for msg "{msg}"')
+        sys.exit(RC_UNKNOWN)
+
+
+def run_check_and_exit(setup: t_setup) -> None:
+    cert_infos = get_cert_infos(setup['certbot'])
+
+    nagios_exit_based_on_cert_infos(setup, cert_infos)
+
+
+def recall(setup: t_setup) -> None:
+    sudo_user = setup["run_as"]
+
+    sudo_prog = "/usr/bin/sudo"
+
+    new_prog_call = " ".join(sys.argv) + " --__recall"
+    prog = sys.argv[0]
+
+    sudo_check = f"{sudo_prog} -n -u {sudo_user} {prog} --__exec_check"
+    process = Popen(sudo_check, stdout=PIPE, stderr=STDOUT, shell=True)
+
+    (output, err) = process.communicate()
+    check_rc = process.wait()
+
+    if check_rc != RC_EXEC_CHECK:
+        output_utf8 = output.decode("UTF-8").replace("\n", "\n")
+
+        nagios_exit(
+            "UNKNOWN",
+            f'Not allowed to execute "{new_prog_call}"; error => {output_utf8}',
+        )
+
+    sudo_call = f"{sudo_prog} -u {sudo_user} {new_prog_call}"
+
+    sys.exit(os.system(sudo_call))
+
+
+def get_cert_infos(certbot_prog: str) -> list[dict]:
+    lines = get_cerbot_certs_output_lines(certbot_prog)
+
+    cert_list = parse_certbot_certs_output_lines(lines)
+
+    return cert_list
+
+
+def get_cerbot_certs_output_lines(certbot_prog: str) -> list:
+    certbot_call = f'{certbot_prog} certificates'
+
+    process = Popen(certbot_call, stdout=PIPE, stderr=STDOUT, shell=True)
+
+    (output, err) = process.communicate()
+    check_rc = process.wait()
+
+    output_utf8 = output.decode("UTF-8")
+
+    if check_rc != 0:
+        output_utf8 = output_utf8.replace('\n', '\\n')
+        nagios_exit(
+            'UNKNOWN',
+            f'{certbot_prog} call returned rc {check_rc} => {output_utf8}')
+
+    lines = output_utf8.split('\n')
+    return lines
+
+
+def parse_certbot_certs_output_lines(lines: list) -> list[dict]:
+    certs = list()
+
+    pattern_cert_item = make_cert_item_pattern()
+    cert_current = make_empty_cert_dict()
+
+    for line_numn, line in enumerate(lines, start=1):
+        line = line.strip()
+
+        item_match = pattern_cert_item.match(line)
+        if not item_match:
+            continue
+
+        item_key = item_match.group(1)
+        item_value = item_match.group(2)
+
+        if item_key == 'Expiry Date':
+            timestamp_str = ''.join(item_value.split(' ')[:2])
+            item_value = datetime.strptime(
+                timestamp_str, "%Y-%m-%d%H:%M:%S%z")
+
+        elif item_key == 'Domains':
+            item_value = item_value.split(' ')
+
+        cert_current[item_key] = item_value
+        assert cert_current[item_key] is not None
+
+        if not any(v is None for v in cert_current.values()):
+            certs.append(dict(cert_current))
+            cert_current = make_empty_cert_dict()
+
+    return certs
+
+
+def make_empty_cert_dict() -> dict:
+    return {
+        'Certificate Name': None,
+        'Serial Number': None,
+        'Key Type': None,
+        'Domains': None,
+        'Expiry Date': None,
+        'Certificate Path': None,
+        'Private Key Path': None,
+    }
+
+
+def make_cert_item_pattern():
+    cert_example = make_empty_cert_dict()
+    cert_keys = list(cert_example.keys())
+
+    cert_pattern = r'(' + '|'.join(cert_keys) + r'):\s+(.+)$'
+
+    return re.compile(cert_pattern)
+
+
+def nagios_exit_based_on_cert_infos(
+        setup: dict, cert_infos: list[dict]) -> None:
+    found_warning = list()
+    found_critical = list()
+    found_ok = list()
+
+    now = datetime.now(timezone.utc)
+
+    for cert in cert_infos:
+        expiry_date = cert['Expiry Date']
+        expiration_in_days = (expiry_date - now).days
+
+        if expiration_in_days < setup['critical']:
+            found_critical.append(cert)
+        if expiration_in_days < setup['warning']:
+            found_warning.append(cert)
+        else:
+            found_ok.append(cert)
+
+    amount_warning = len(found_warning)
+    amount_critical = len(found_critical)
+    amount_ok = len(found_ok)
+
+    domain = "Let's Encrypt"
+
+    if amount_critical == 0 and amount_warning == 0:
+        nagios_exit(
+            'OK',
+            (
+                f'Found no {domain} certificate issues '
+                f'(checked {amount_ok})'
+            )
+        )
+
+    if amount_critical > 0:
+        nagios_exit(
+            'CRITICAL', 
+            (
+                f'Found {amount_critical} {domain} certificate(s) '
+                'with very near expiration or already expired'
+            )
+        )
+    elif amount_warning > 0:
+        nagios_exit(
+            'WARNING', 
+            (
+                f'Found {amount_warning} {domain} certificate(s) where the '
+                'expiration date is closer than expected'
+            )
+        )
+
+    else:
+        raise NotImplemented('unexpected program path')
+
+
+# ----------------------------------------------------------------------------
+# main
+# ----------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    main()
