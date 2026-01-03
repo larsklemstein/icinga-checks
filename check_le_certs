@@ -343,6 +343,8 @@ def make_cert_item_pattern():
     return re.compile(cert_pattern)
 
 
+# TODO: Refactor, function is too long. 
+#
 def nagios_exit_based_on_cert_infos(
         setup: dict, cert_infos: list[dict]) -> None:
     found_warning = list()
