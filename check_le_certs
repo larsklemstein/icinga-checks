@@ -134,7 +134,6 @@ def get_setup_or_die() -> t_setup:
         print_base_usage_and_exit()
 
     setup = {
-        "containers_dir": "/var/lib/docker/containers",
         "run_as": "",
         "__recalled": False,
         "__exec_check": False,
