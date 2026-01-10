@@ -249,7 +249,7 @@ def run_check_and_exit(setup: t_setup) -> None:
             max_size_critical,
         )
     ):
-        nagios_exit("OK", "Docker log file amounts and sizes are fine")
+        nagios_exit("OK", "Docker container log file amounts and sizes are fine")
     else:
         amount_critical = len(max_amount_critical)
         amount_warning = len(max_amount_warning)

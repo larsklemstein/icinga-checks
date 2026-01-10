@@ -374,7 +374,7 @@ def nagios_exit_based_on_cert_infos(
         nagios_exit(
             'OK',
             (
-                f'Found no {domain} certificate issues '
+                f'{domain} certificates are fine '
                 f'(checked {amount_ok})'
             )
         )
